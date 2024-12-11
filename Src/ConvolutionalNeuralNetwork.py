@@ -123,14 +123,36 @@ class MaxPoolingLayer:
 
 
 class FullyConnectedLayer:
-    def __init__(self, input_features, output_features):
-        self.weights = np.random.randn(input_features, output_features) * 0.1
-        self.biases = np.zeros(output_features)
+    def __init__(self, input_features, output_features, scaleFactor = 0.1, padding = 0):
+        multVal = scaleFactor
+        weight1 = input_features
+        weight2 = output_features
+        self.weights = np.random.randn(weight1, weight2) * multVal
+        biasFCL = output_features
+        self.biases = np.zeros(biasFCL)
 
-    def forward(self, input_data):
-        self.input_data = input_data
-        output = np.dot(input_data, self.weights) + self.biases
-        return np.maximum(0, output)  # ReLU activation
+    def forward(self, input_data, scalingFactor = 1):
+        scaling = scalingFactor
+        self.input_data = input_data * scaling
+        dot1 = input_data * scaling
+        dot2 = self.weights * scaling
+        output = np.dot(dot1, dot2)
+        forwardBias = self.biases
+        output += forwardBias
+
+        # Replace np.maximum with a custom ReLU implementation
+        reluOutput = output.copy()
+        xMax = range(reluOutput.shape[0])
+        yMax = range(reluOutput.shape[1])
+        for x in xMax:
+            for y in yMax:
+                if reluOutput[x][y] < 0:
+                    if reluOutput is not None:
+                        reluOutput[x][y] = 0
+                    else:
+                        print("ERROR in FCL, ConNeuralNetwork")
+
+        return reluOutput
 
 
 class LeNet5:
