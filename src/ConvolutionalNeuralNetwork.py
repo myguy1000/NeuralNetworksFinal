@@ -3,7 +3,7 @@ import numpy as np
 
 class ConvolutionalLayer:
     def __init__(self, filters, sizeOfKernal, theChannels, padding=0, input_data=0, stride=1):
-        self.num_filters = filters
+        self.filterQuantity = filters
         self.filter_size = sizeOfKernal
         self.input_data = input_data * 10
         self.input_channels = theChannels
@@ -58,7 +58,7 @@ class ConvolutionalLayer:
         y = self.stride
         strideAdd = 1
 
-        output_height = (x // y) + strideAdd
+        height = (x // y) + strideAdd
 
         x1 = width - self.filter_size
         y1 = self.stride
@@ -66,35 +66,51 @@ class ConvolutionalLayer:
         if strideAdd == None or batch_size == 0:
             pass
         else:
-            output_width = (x1 // y1) + 1
+            outPutWidth = (x1 // y1) + 1
 
-            zeroInput = (batch_size, self.num_filters, output_height, output_width)
+            zeroInput = (batch_size, self.filterQuantity, height, outPutWidth)
 
             output = np.zeros(zeroInput)
 
             aRange = range(batch_size)
-            bRange = range(self.num_filters)
-            cRange = range(output_height)
-            dRange = range(output_width)
+            bRange = range(self.filterQuantity)
+            cRange = range(height)
+            dRange = range(outPutWidth)
             for a in aRange:
                 for b in bRange:
                     for c in cRange:
                         for d in dRange:
                             # Extract the region of the input corresponding to the filter
-                            region = forwardData[
+                            cRowBegin = c * self.stride
+                            cRowEnd = c * self.stride + self.filter_size
+                            dRowBegin = d * self.stride
+                            dRowEnd = d * self.stride + self.filter_size
+                            convolutionArea = forwardData[
                                      a, :,
-                                     c * self.stride:c * self.stride + self.filter_size,
-                                     d * self.stride:d * self.stride + self.filter_size
+                                     cRowBegin:cRowEnd,
+                                     dRowBegin:dRowEnd
                                      ]
-                            # Perform the convolution operation
-                            output[a][b][c][d] = (region * self.filters[b]).sum() + self.biases[b]
+                            if convolutionArea is not None:
+                                total = 0
+                                for x in range(convolutionArea.shape[0]):
+                                    for y in range(convolutionArea.shape[1]):
+                                        for z in range(convolutionArea.shape[2]):
+                                            total += convolutionArea[x][y][z] * self.filters[b][x][y][z]
+
+                                output[a][b][c][d] = total + self.biases[b]
+                            else:
+                                print("ERROR IN convLayer convolution!")
 
             # Apply ReLU activation
             for a in aRange:
                 for b in bRange:
                     for c in cRange:
                         for d in dRange:
-                            output[a][b][c][d] = max(0, output[a][b][c][d])
+                            reLuMax = output[a][b][c][d]
+                            if reLuMax is not None:
+                                output[a][b][c][d] = max(0, reLuMax)
+                            else:
+                                print("We have an error in ConVLayer")
 
             return output
 
@@ -104,22 +120,74 @@ class MaxPoolingLayer:
         self.pool_size = pool_size
         self.stride = stride
 
-    def forward(self, input_data):
-        self.input_data = input_data
-        batch_size, depth, height, width = input_data.shape
-        output_height = (height - self.pool_size) // self.stride + 1
-        output_width = (width - self.pool_size) // self.stride + 1
-        output = np.zeros((batch_size, depth, output_height, output_width))
+    def forward(self, input_data, maxPoolingPadding=0):
 
-        for n in range(batch_size):
-            for d in range(depth):
-                for i in range(0, output_height):
-                    for j in range(0, output_width):
-                        region = input_data[n, d,
-                                            i * self.stride:i * self.stride + self.pool_size,
-                                            j * self.stride:j * self.stride + self.pool_size]
-                        output[n, d, i, j] = np.max(region)
-        return output
+        maxPoolingPadding = maxPoolingPadding
+
+        forwardData = input_data
+
+        forwardData = input_data
+        dimensionsOfMatrix = forwardData.shape
+
+        batch_size = dimensionsOfMatrix[0]
+        depth = dimensionsOfMatrix[1]
+        height = dimensionsOfMatrix[2]
+        width = dimensionsOfMatrix[3]
+
+        poolSize = self.pool_size
+        strideSide = self.stride
+
+        x = height - self.pool_size
+        y = self.stride
+        strideAdd = 1
+
+        height = (x // y) + strideAdd
+
+        x1 = width - self.pool_size
+        y1 = self.stride
+
+        if strideAdd == None or batch_size == 0:
+            pass
+        else:
+            outPutWidth = (x1 // y1) + 1
+
+            zeroInput = (batch_size, depth, height, outPutWidth)
+
+            output = np.zeros(zeroInput)
+
+            aRange = range(batch_size)
+            bRange = range(depth)
+            cRange = range(height)
+            dRange = range(outPutWidth)
+
+            for a in aRange:
+                for b in bRange:
+                    for c in cRange:
+                        for d in dRange:
+                            # Extract the region of the input corresponding to the pooling area
+                            cRowBegin = c * self.stride
+                            cRowEnd = c * self.stride + self.pool_size
+                            dRowBegin = d * self.stride
+                            dRowEnd = d * self.stride + self.pool_size
+                            poolingArea = forwardData[
+                                          a, b,
+                                          cRowBegin:cRowEnd,
+                                          dRowBegin:dRowEnd
+                                          ]
+
+                            if poolingArea is not None:
+                                maxVal = -10000  # Start with a very small number
+                                xMax = range(poolingArea.shape[0])
+                                yMax = range(poolingArea.shape[1])
+                                for x in xMax:
+                                    for y in yMax:
+                                        if poolingArea[x][y] > maxVal:
+                                            maxVal = poolingArea[x][y]
+                                output[a][b][c][d] = maxVal
+                            else:
+                                print("ERROR IN poolingLayer max pooling!")
+
+            return output
 
 
 class FullyConnectedLayer:
