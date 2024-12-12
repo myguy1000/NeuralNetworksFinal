@@ -360,6 +360,7 @@ class LeNet5:
         self.fc3 = FullyConnectedLayer(input_features=84, output_features=num_classes)
 
     def forward(self, input_data):
+        print("forward")
         # forward pass through LeNet5
         x = self.conv1.forward(input_data)
         x = self.pool1.forward(x)
@@ -374,6 +375,7 @@ class LeNet5:
         return output
 
     def backward(self, d_out, learning_rate=0.01):
+        print("backward")
         # backprop through entire network
         d_out = self.fc3.backward(d_out)
         d_out = self.fc2.backward(d_out)
