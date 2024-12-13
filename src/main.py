@@ -22,6 +22,7 @@ learning_rate = 0.001
 reduced_data_size = .01 # ex. 0.01 means you're only using 1/100th of the data in both train and test
 loss_track = []
 accuracy_track = []
+# end of training parameters
 
 # End of user hyperparameter setting
 
@@ -38,19 +39,15 @@ print("parameters selected")
 print(f"data_selected: {data_selected}, epochs: {epochs}, learning_rate: {learning_rate}, reduced_data_size: {reduced_data_size * 100} percent")
 print("")
 
-# end of training parameters
 
-# Load and preprocess the MNIST dataset using openml from scikit-learn
+# Load and preprocess the MNIST dataset
 mnist = fetch_openml('mnist_784', version=1)
 X_mnist, y_mnist = mnist["data"].to_numpy(), mnist["target"].to_numpy()
 
 # Reshape and normalize images
 X_mnist = X_mnist.reshape(-1, 28, 28, 1).astype('float32') / 255.0
-
-# Resize images to 32x32
 X_mnist = np.pad(X_mnist, ((0,0),(2,2),(2,2),(0,0)), 'constant')
 
-# One-hot encode labels
 encoder = OneHotEncoder(sparse_output=False)
 y_mnist = encoder.fit_transform(y_mnist.reshape(-1, 1))
 
@@ -58,18 +55,16 @@ print("MNIST dataset loaded:")
 print(f"Images shape: {X_mnist.shape}")
 print(f"Labels shape: {y_mnist.shape}")
 print("")
-# Convert TensorFlow tensors to NumPy arrays (if needed)
+
 X_mnist = np.array(X_mnist)
 y_mnist = np.array(y_mnist)
 
-# Load and preprocess the CIFAR-10 dataset using tf.keras.datasets.cifar10.load_data()
 (X_cifar10_train, y_cifar10_train), (X_cifar10_test, y_cifar10_test) = cifar10.load_data()
 
 # Normalize images
 X_cifar10_train = X_cifar10_train.astype('float32') / 255.0
 X_cifar10_test = X_cifar10_test.astype('float32') / 255.0
 
-# One-hot encode labels
 y_cifar10_train = tf.keras.utils.to_categorical(y_cifar10_train, 10)
 y_cifar10_test = tf.keras.utils.to_categorical(y_cifar10_test, 10)
 
@@ -105,9 +100,6 @@ else: # data = cifar-10
     y_test = y_cifar10_test
     X_train, _, y_train, _ = train_test_split(X_train, y_train, test_size=1 - reduced_data_size, random_state=42)
     _, X_test, _, y_test = train_test_split(X_test, y_test, test_size=reduced_data_size, random_state=42)
-
-#X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=1 - reduced_data_size, random_state=33)
-#_, X_test, _, y_test = train_test_split(X_test, y_test, test_size=reduced_data_size, random_state=33)
 
 print(f"REDUCED Training images shape: {X_train.shape}")
 print(f"REDUCED Training labels shape: {y_train.shape}")
@@ -151,12 +143,12 @@ for epoch in range(epochs):
         d_out = y_pred - y_batch  # Gradient of loss w.r.t. predictions
         model.backward(d_out, learning_rate)
 
-    # Record and print the average loss for this epoch
+    # print average loss
     epoch_loss = np.mean(batch_losses)
     loss_track.append(epoch_loss)
     print(f"Epoch {epoch + 1}/{epochs}, Loss: {epoch_loss:.4f}")
 
-    # Calculate accuracy at the end of each epoch
+    # Calculate accuracy
     correct_predictions = 0
     for i in range(0, X_test.shape[0], batch_size):
         X_batch = X_test[i:i + batch_size]
