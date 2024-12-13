@@ -84,26 +84,14 @@ class ConvolutionalLayer:
                                               dRowBegin:dRowEnd
                                               ]
                             if convolutionArea is not None:
-                                total = 0
-                                for x_index in range(convolutionArea.shape[0]):
-                                    for y_index in range(convolutionArea.shape[1]):
-                                        for z_index in range(convolutionArea.shape[2]):
-                                            total += convolutionArea[x_index][y_index][z_index] * self.filters[b][x_index][y_index][z_index]
-
-                                output[a][b][c][d] = total + self.biases[b]
+                                # Compute the convolution as the elementwise product summed over all dimensions
+                                total = np.sum(convolutionArea * self.filters[b])
+                                output[a, b, c, d] = total + self.biases[b]
                             else:
                                 print("ERROR IN convLayer convolution!")
 
             # Apply ReLU activation
-            for a in aRange:
-                for b in bRange:
-                    for c in cRange:
-                        for d in dRange:
-                            reLuMax = output[a][b][c][d]
-                            if reLuMax is not None:
-                                output[a][b][c][d] = max(0, reLuMax)
-                            else:
-                                print("We have an error in ConVLayer")
+            output = np.maximum(0, output)
 
             # store for backward
             self.last_input = input_data
@@ -129,25 +117,27 @@ class ConvolutionalLayer:
         d_biases = np.zeros_like(self.biases)
         d_input_padded = np.zeros_like(padded_input)
 
-        # compute gradients for filters, biases, input
-        for a in range(batch_size):
-            for b in range(filt_count):
-                for c in range(out_height):
-                    for d_i in range(out_width):
-                        h_start = c * self.stride
-                        h_end = h_start + self.filter_size
-                        w_start = d_i * self.stride
-                        w_end = w_start + self.filter_size
+        # Compute gradients for inputs
+        rotated_filters = np.flip(self.filters, axis=(2, 3))  # Flip filters for gradient computation
+        d_input_padded = np.zeros_like(padded_input)
 
-                        region = padded_input[a, :, h_start:h_end, w_start:w_end]
-                        d_filters[b] += region * d_out[a, b, c, d_i]
-                        d_biases[b] += d_out[a, b, c, d_i]
+        # Reshape d_out for broadcasting
+        d_out_reshaped = d_out.transpose(1, 0, 2, 3).reshape(filt_count, batch_size, out_height, out_width)
 
-                        # accumulate gradient to input
-                        for x_i in range(region.shape[0]):
-                            for y_i in range(region.shape[1]):
-                                for z_i in range(region.shape[2]):
-                                    d_input_padded[a, x_i, h_start+y_i, w_start+z_i] += self.filters[b, x_i, y_i, z_i] * d_out[a, b, c, d_i]
+        # Accumulate gradients for each filter
+        for b in range(filt_count):
+            for c in range(out_height):
+                for d_i in range(out_width):
+                    h_start = c * self.stride
+                    h_end = h_start + self.filter_size
+                    w_start = d_i * self.stride
+                    w_end = w_start + self.filter_size
+
+                    # Add contributions from this filter
+                    d_input_padded[:, :, h_start:h_end, w_start:w_end] += (
+                            d_out_reshaped[b, :, c, d_i][:, np.newaxis, np.newaxis, np.newaxis]
+                            * rotated_filters[b][np.newaxis, :, :, :]
+                    )
 
         # remove padding from input gradient
         if self.padding > 0:
@@ -161,15 +151,9 @@ class ConvolutionalLayer:
         return d_input
 
     def update_params(self, learning_rate):
-        # update filters and biases
-        for i in range(self.filters.shape[0]):
-            for j in range(self.filters.shape[1]):
-                for k in range(self.filters.shape[2]):
-                    for l in range(self.filters.shape[3]):
-                        self.filters[i, j, k, l] -= learning_rate * self.d_filters[i, j, k, l]
-
-        for i in range(self.biases.shape[0]):
-            self.biases[i] -= learning_rate * self.d_biases[i]
+        # Update filters and biases
+        self.filters -= learning_rate * self.d_filters
+        self.biases -= learning_rate * self.d_biases
 
 
 class MaxPoolingLayer:
@@ -179,7 +163,6 @@ class MaxPoolingLayer:
 
     def forward(self, input_data, maxPoolingPadding=0):
         maxPoolingPadding = maxPoolingPadding
-        forwardData = input_data
         forwardData = input_data
         dimensionsOfMatrix = forwardData.shape
 
@@ -317,23 +300,18 @@ class FullyConnectedLayer:
         d_biases = np.zeros_like(self.biases)
         d_input = np.zeros_like(self.last_input)
 
-        # gradients wrt weights, bias
-        for i in range(d_out.shape[0]):
-            for j in range(d_out.shape[1]):
-                d_biases[j] += d_out[i][j]
-                for k in range(self.weights.shape[0]):
-                    d_weights[k][j] += self.input_data[i][k] * d_out[i][j]
+        # Gradients with respect to biases
+        d_biases += np.sum(d_out, axis=0)
 
-        # gradients wrt input
-        for i in range(d_out.shape[0]):
-            for k in range(self.weights.shape[0]):
-                val = 0
-                for j in range(self.weights.shape[1]):
-                    val += d_out[i][j] * self.weights[k][j]
-                d_input[i][k] = val
+        # Gradients with respect to weights
+        d_weights += np.dot(self.input_data.T, d_out)
+
+        # Gradients with respect to inputs
+        d_input = np.dot(d_out, self.weights.T)
 
         self.d_weights = d_weights
         self.d_biases = d_biases
+
         return d_input
 
     def update_params(self, learning_rate):
@@ -360,7 +338,6 @@ class LeNet5:
         self.fc3 = FullyConnectedLayer(input_features=84, output_features=num_classes)
 
     def forward(self, input_data):
-        print("forward")
         # forward pass through LeNet5
         x = self.conv1.forward(input_data)
         x = self.pool1.forward(x)
@@ -375,7 +352,6 @@ class LeNet5:
         return output
 
     def backward(self, d_out, learning_rate=0.01):
-        print("backward")
         # backprop through entire network
         d_out = self.fc3.backward(d_out)
         d_out = self.fc2.backward(d_out)
