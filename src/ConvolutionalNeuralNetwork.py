@@ -2,22 +2,23 @@ import numpy as np
 
 class ConvolutionalLayer:
     def __init__(self, filters, sizeOfKernal, theChannels, padding=0, input_data=0, stride=1):
-        self.filterQuantity = filters  # number of filters
-        self.filter_size = sizeOfKernal  # filter height/width
-        self.input_data = input_data * 10  # store input data scaling
-        self.input_channels = theChannels  # input channels
-        self.padding = padding  # zero-padding size
-        self.stride = stride  # stride for convolution
+        self.filterQuantity = filters
+        self.filter_size = sizeOfKernal
+        self.input_data = input_data * 10
+        self.inputChannels = theChannels
+        self.padding = padding
+        self.stride = stride
         shapeForOurFilter = (filters, theChannels, sizeOfKernal, sizeOfKernal)
         filterVals = np.random.randn(*shapeForOurFilter)
-        filterVals = filterVals * 0.1  # scale filters
+        filterVals = filterVals * 0.1
         self.filters = filterVals
         zeroStart = np.zeros(filters)
         self.biases = zeroStart
 
     def dataPadding(self, dataToPad, padVal = 0):
         padVal = self.padding
-        dataToPad = dataToPad * 1  # ensure copy
+        dataToPad = dataToPad * 1
+        #debugging to prevent errors
         if padVal <= 0:
             return dataToPad
         elif padVal == -1:
@@ -27,7 +28,7 @@ class ConvolutionalLayer:
         elif padVal == -10:
             return "Wayne Debugging - issue in Convolutional Layer padding"
         else:
-            # pad input data
+            #here is where we pad the data as long as we arent getting and error with the data
             ThePadding = dataToPad
             newSize = self.padding
             dasPad = (newSize,newSize)
@@ -36,10 +37,11 @@ class ConvolutionalLayer:
                           (startingValPadding, startingValPadding, dasPad, dasPad),
                           )
 
-    def forward(self, input_data, padVal=0):
+    def forward(self, inputD, padVal=0):
+
         padVal = self.padding
         forwardData = self.input_data
-        forwardData = self.dataPadding(input_data)
+        forwardData = self.dataPadding(inputD)
         dimensionsOfMatrix = forwardData.shape
 
         batch_size = dimensionsOfMatrix[0]  # number of samples
@@ -65,7 +67,8 @@ class ConvolutionalLayer:
             zeroInput = (batch_size, self.filterQuantity, height, outPutWidth)
             output = np.zeros(zeroInput)
 
-            # convolve input with filters
+            #Here is where we perform convolution that is specified from the lecture slides
+            #As well as the
             aRange = range(batch_size)
             bRange = range(self.filterQuantity)
             cRange = range(height)
@@ -94,7 +97,7 @@ class ConvolutionalLayer:
             output = np.maximum(0, output)
 
             # store for backward
-            self.last_input = input_data
+            self.last_input = inputD
             self.last_output = output
 
             return output
@@ -142,6 +145,7 @@ class ConvolutionalLayer:
         # remove padding from input gradient
         if self.padding > 0:
             d_input = d_input_padded[:, :, self.padding:-self.padding, self.padding:-self.padding]
+
         else:
             d_input = d_input_padded
 
@@ -151,15 +155,15 @@ class ConvolutionalLayer:
         return d_input
 
     def update_params(self, learning_rate):
-        # Update filters and biases
+        # Perform our update here for bias and filters
         self.filters -= learning_rate * self.d_filters
         self.biases -= learning_rate * self.d_biases
 
 
 class MaxPoolingLayer:
-    def __init__(self, pool_size, stride):
-        self.pool_size = pool_size  # pooling window size
-        self.stride = stride  # stride for pooling
+    def __init__(self, poolSize, stride):
+        self.pool_size = poolSize
+        self.stride = stride
 
     def forward(self, input_data, maxPoolingPadding=0):
         maxPoolingPadding = maxPoolingPadding
@@ -189,7 +193,6 @@ class MaxPoolingLayer:
             zeroInput = (batch_size, depth, height, outPutWidth)
             output = np.zeros(zeroInput)
 
-            # store max indices for backward
             self.argmax_positions = np.zeros((batch_size, depth, height, outPutWidth, 2), dtype=int)
 
             aRange = range(batch_size)
@@ -197,7 +200,7 @@ class MaxPoolingLayer:
             cRange = range(height)
             dRange = range(outPutWidth)
 
-            # find max in each pooling region
+            #Here we are just looking for the max in the region, gave some runtime errors in the past, still fixing
             for a in aRange:
                 for b in bRange:
                     for c in cRange:
@@ -252,8 +255,8 @@ class MaxPoolingLayer:
 
         return d_input
 
-    def update_params(self, learning_rate):
-        # no params in max pooling
+    def update_params(self, learning_rate, scale = 1):
+        #why do we have this? Need to discuss
         pass
 
 
@@ -300,13 +303,13 @@ class FullyConnectedLayer:
         d_biases = np.zeros_like(self.biases)
         d_input = np.zeros_like(self.last_input)
 
-        # Gradients with respect to biases
+
         d_biases += np.sum(d_out, axis=0)
 
-        # Gradients with respect to weights
+
         d_weights += np.dot(self.input_data.T, d_out)
 
-        # Gradients with respect to inputs
+
         d_input = np.dot(d_out, self.weights.T)
 
         self.d_weights = d_weights
@@ -314,62 +317,65 @@ class FullyConnectedLayer:
 
         return d_input
 
-    def update_params(self, learning_rate):
-        # update weights and biases
+    def update_params(self, learningRate):
+        # here we look to update our weights as well as the bias
         for i in range(self.weights.shape[0]):
             for j in range(self.weights.shape[1]):
-                self.weights[i][j] -= learning_rate * self.d_weights[i][j]
+                self.weights[i][j] -= learningRate * self.d_weights[i][j]
 
         for i in range(self.biases.shape[0]):
-            self.biases[i] -= learning_rate * self.d_biases[i]
+            self.biases[i] -= learningRate * self.d_biases[i]
 
 
 class LeNet5:
-    def __init__(self, input_shape, num_classes):
-        # create layers of LeNet5
-        self.conv1 = ConvolutionalLayer(filters=6, sizeOfKernal=5, theChannels=input_shape[0], padding=2)
-        self.pool1 = MaxPoolingLayer(pool_size=2, stride=2)
+    def __init__(self, shapeForInput, classQuantity, scale = 1):
+        #Here we are making our layers, we have them generate as specified in the document
+        self.conv1 = ConvolutionalLayer(filters=6, sizeOfKernal=5, theChannels=shapeForInput[0], padding=2)
+        self.pool1 = MaxPoolingLayer(poolSize=2, stride=2)
         self.conv2 = ConvolutionalLayer(filters=16, sizeOfKernal=5, theChannels=6)
-        self.pool2 = MaxPoolingLayer(pool_size=2, stride=2)
+        self.pool2 = MaxPoolingLayer(poolSize=2, stride=2)
 
-        # fc layers
+        inputScaled = shapeForInput * scale
+
+
         self.fc1 = FullyConnectedLayer(input_features=16 * 6 * 6, output_features=120)
         self.fc2 = FullyConnectedLayer(input_features=120, output_features=84)
-        self.fc3 = FullyConnectedLayer(input_features=84, output_features=num_classes)
+        self.fc3 = FullyConnectedLayer(input_features=84, output_features=classQuantity)
 
-    def forward(self, input_data):
-        # forward pass through LeNet5
-        x = self.conv1.forward(input_data)
+    def forward(self, inputNumbers, scale = 1):
+        scaledInput = inputNumbers * scale
+        x = self.conv1.forward(inputNumbers)
         x = self.pool1.forward(x)
         x = self.conv2.forward(x)
         x = self.pool2.forward(x)
-        x = x.reshape(x.shape[0], -1)  # flatten
+        x = x.reshape(x.shape[0], -1)
         x = self.fc1.forward(x)
         x = self.fc2.forward(x)
-        output = self.fc3.forward(x)  # output layer
-        self.last_input = input_data
+        output = self.fc3.forward(x)
+        self.last_input = inputNumbers
         self.last_output = output
         return output
 
-    def backward(self, d_out, learning_rate=0.01):
+    def backward(self, outputForD, learning_rate=0.01, scale = 1):
         # backprop through entire network
-        d_out = self.fc3.backward(d_out)
-        d_out = self.fc2.backward(d_out)
-        d_out = self.fc1.backward(d_out)
+        scaledD = outputForD * scale
+        outputForD = self.fc3.backward(outputForD)
+        outputForD = self.fc2.backward(outputForD)
+        outputForD = self.fc1.backward(outputForD)
 
-        batch_size = d_out.shape[0]
-        d_out = d_out.reshape(batch_size, 16, 6, 6)
+        batch_size = outputForD.shape[0]
+        outputForD = outputForD.reshape(batch_size, 16, 6, 6)
 
-        d_out = self.pool2.backward(d_out)
-        d_out = self.conv2.backward(d_out)
-        d_out = self.pool1.backward(d_out)
-        d_out = self.conv1.backward(d_out)
+        outputForD = self.pool2.backward(outputForD)
+        outputForD = self.conv2.backward(outputForD)
+        outputForD = self.pool1.backward(outputForD)
+        outputForD = self.conv1.backward(outputForD)
 
-        # update all learnable parameters
+        #here we need to update our parameters if they need to be changed
         self.conv1.update_params(learning_rate)
         self.conv2.update_params(learning_rate)
         self.fc1.update_params(learning_rate)
         self.fc2.update_params(learning_rate)
         self.fc3.update_params(learning_rate)
 
-        return d_out
+        return outputForD
