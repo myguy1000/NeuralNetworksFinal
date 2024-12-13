@@ -112,7 +112,7 @@ class ConvolutionalLayer:
         out_height = d_out.shape[2]
         out_width = d_out.shape[3]
 
-        # ReLU gradient
+        #calculations for our relu function
         relu_mask = (self.last_output > 0).astype(float)
         d_out = d_out * relu_mask
 
@@ -120,14 +120,14 @@ class ConvolutionalLayer:
         d_biases = np.zeros_like(self.biases)
         d_input_padded = np.zeros_like(padded_input)
 
-        # Compute gradients for inputs
+        #making filters/updating them and padding
         rotated_filters = np.flip(self.filters, axis=(2, 3))  # Flip filters for gradient computation
         d_input_padded = np.zeros_like(padded_input)
 
-        # Reshape d_out for broadcasting
+        #Rechape from transpose/reschape functions
         d_out_reshaped = d_out.transpose(1, 0, 2, 3).reshape(filt_count, batch_size, out_height, out_width)
 
-        # Accumulate gradients for each filter
+        #Looping for the d_input
         for b in range(filt_count):
             for c in range(out_height):
                 for d_i in range(out_width):
@@ -136,13 +136,14 @@ class ConvolutionalLayer:
                     w_start = d_i * self.stride
                     w_end = w_start + self.filter_size
 
-                    # Add contributions from this filter
+                    #Adding to the d_input the necessary vals
                     d_input_padded[:, :, h_start:h_end, w_start:w_end] += (
                             d_out_reshaped[b, :, c, d_i][:, np.newaxis, np.newaxis, np.newaxis]
                             * rotated_filters[b][np.newaxis, :, :, :]
                     )
 
-        # remove padding from input gradient
+        #here we just want to get rid of the padding to get it ready to ship like a christmas gift
+        #excited for the break lol
         if self.padding > 0:
             d_input = d_input_padded[:, :, self.padding:-self.padding, self.padding:-self.padding]
 
