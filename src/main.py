@@ -8,28 +8,57 @@ import time
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+# Start of user hyperparamater setting
+
+# Choose which dataset to run (only pick one)
+mnist_f = False
+cifar_f = True
+
+# Define training parameters
+epochs = 10
+batch_size = 32
+learning_rate = 0.001
+reduced_data_size = .01 # ex. 0.01 means you're only using 1/100th of the data in both train and test
+loss_history = []
+
+# End of user hyperparameter setting
+
+num_channels = 0
+model_selected = ""
+if cifar_f:
+    num_channels = 3
+    data_selected = "cifar-10"
+else: # mnist = True
+    num_channels = 1
+    data_selected = "mnist"
+print("")
+print("parameters selected")
+print(f"data_selected: {data_selected}, epochs: {epochs}, learning_rate: {learning_rate}, reduced_data_size: {reduced_data_size * 100} percent")
+print("")
+
+# end of training parameters
 
 # Load and preprocess the MNIST dataset using openml from scikit-learn
-#mnist = fetch_openml('mnist_784', version=1)
-#X_mnist, y_mnist = mnist["data"].to_numpy(), mnist["target"].to_numpy()
+mnist = fetch_openml('mnist_784', version=1)
+X_mnist, y_mnist = mnist["data"].to_numpy(), mnist["target"].to_numpy()
 
 # Reshape and normalize images
-#X_mnist = X_mnist.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+X_mnist = X_mnist.reshape(-1, 28, 28, 1).astype('float32') / 255.0
 
 # Resize images to 32x32
-#X_mnist = np.pad(X_mnist, ((0,0),(2,2),(2,2),(0,0)), 'constant')
+X_mnist = np.pad(X_mnist, ((0,0),(2,2),(2,2),(0,0)), 'constant')
 
 # One-hot encode labels
-#encoder = OneHotEncoder()
-#y_mnist = encoder.fit_transform(y_mnist.reshape(-1, 1))
+encoder = OneHotEncoder(sparse_output=False)
+y_mnist = encoder.fit_transform(y_mnist.reshape(-1, 1))
 
-#print("MNIST dataset loaded:")
-#print(f"Images shape: {X_mnist.shape}")
-#print(f"Labels shape: {y_mnist.shape}")
-
+print("MNIST dataset loaded:")
+print(f"Images shape: {X_mnist.shape}")
+print(f"Labels shape: {y_mnist.shape}")
+print("")
 # Convert TensorFlow tensors to NumPy arrays (if needed)
-#X_mnist = np.array(X_mnist)
-#y_mnist = np.array(y_mnist)
+X_mnist = np.array(X_mnist)
+y_mnist = np.array(y_mnist)
 
 # Load and preprocess the CIFAR-10 dataset using tf.keras.datasets.cifar10.load_data()
 (X_cifar10_train, y_cifar10_train), (X_cifar10_test, y_cifar10_test) = cifar10.load_data()
@@ -53,34 +82,40 @@ print(f"ALL Training images shape: {X_cifar10_train.shape}")
 print(f"ALL Training labels shape: {y_cifar10_train.shape}")
 print(f"ALL Test images shape: {X_cifar10_test.shape}")
 print(f"ALL Test labels shape: {y_cifar10_test.shape}")
-
-# Define training parameters
-epochs = 4
-batch_size = 32
-learning_rate = 0.001
-reduced_data_size = .01 # ex. 0.01 means you're only using 1/100th of the total data
-loss_history = []
+print("")
 
 ## Training Loop
 
 # Transpose data to match the input shape expected by LeNet5
-X_train = np.transpose(X_cifar10_train, (0, 3, 1, 2))  # (batch_size, channels, height, width)
-X_test = np.transpose(X_cifar10_test, (0, 3, 1, 2))
-y_train = y_cifar10_train
-y_test = y_cifar10_test
-X_train, _, y_train, _ = train_test_split(X_train, y_train, test_size=1 - reduced_data_size, random_state=42)
-_, X_test, _, y_test = train_test_split(X_test, y_test, test_size=reduced_data_size, random_state=42)
+X_train = []
+y_train = []
+X_test = []
+y_teset = []
+if mnist_f:
+    X_train = np.transpose(X_mnist, (0, 3, 1, 2))  # (batch_size, channels, height, width)
+    y_train = y_mnist
+    X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=1 - reduced_data_size, random_state=33)
+    _, X_test, _, y_test = train_test_split(X_test, y_test, test_size=reduced_data_size, random_state=33)
+else: # data = cifar-10
+    X_train = np.transpose(X_cifar10_train, (0, 3, 1, 2))  # (batch_size, channels, height, width)
+    X_test = np.transpose(X_cifar10_test, (0, 3, 1, 2))
+    y_train = y_cifar10_train
+    y_test = y_cifar10_test
+    X_train, _, y_train, _ = train_test_split(X_train, y_train, test_size=1 - reduced_data_size, random_state=42)
+    _, X_test, _, y_test = train_test_split(X_test, y_test, test_size=reduced_data_size, random_state=42)
+
+#X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=1 - reduced_data_size, random_state=33)
+#_, X_test, _, y_test = train_test_split(X_test, y_test, test_size=reduced_data_size, random_state=33)
 
 print(f"REDUCED Training images shape: {X_train.shape}")
 print(f"REDUCED Training labels shape: {y_train.shape}")
 print(f"REDUCED Test images shape: {X_test.shape}")
 print(f"REDUCED Test labels shape: {y_test.shape}")
-
+print("")
 # Initialize the LeNet5 model
-input_shape = (3, 32, 32)  # CIFAR-10 images: 3 channels, 32x32
+input_shape = (num_channels, 32, 32)  # CIFAR-10 images: 3 channels, 32x32
 num_classes = 10
 model = LeNet5(input_shape, num_classes)
-
 
 # Loss function: Cross-Entropy
 def cross_entropy_loss(y_pred, y_true):
