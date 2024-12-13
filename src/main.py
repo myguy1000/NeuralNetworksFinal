@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 from sklearn.datasets import fetch_openml
 from sklearn.preprocessing import OneHotEncoder
 import tensorflow as tf
@@ -19,7 +20,8 @@ epochs = 10
 batch_size = 32
 learning_rate = 0.001
 reduced_data_size = .01 # ex. 0.01 means you're only using 1/100th of the data in both train and test
-loss_history = []
+loss_track = []
+accuracy_track = []
 
 # End of user hyperparameter setting
 
@@ -123,7 +125,6 @@ def cross_entropy_loss(y_pred, y_true):
     return -np.sum(y_true * np.log(y_pred_clipped)) / y_pred.shape[0]
 
 run_start = time.time()
-# Training loop
 for epoch in range(epochs):
     start = time.time()
     print(f"Epoch {epoch+1}/{epochs}")
@@ -152,19 +153,30 @@ for epoch in range(epochs):
 
     # Record and print the average loss for this epoch
     epoch_loss = np.mean(batch_losses)
-    loss_history.append(epoch_loss)
+    loss_track.append(epoch_loss)
     print(f"Epoch {epoch + 1}/{epochs}, Loss: {epoch_loss:.4f}")
-    
+
+    # Calculate accuracy at the end of each epoch
+    correct_predictions = 0
+    for i in range(0, X_test.shape[0], batch_size):
+        X_batch = X_test[i:i + batch_size]
+        y_batch = y_test[i:i + batch_size]
+
+        y_pred = model.forward(X_batch)
+        predictions = np.argmax(y_pred, axis=1)
+        labels = np.argmax(y_batch, axis=1)
+        correct_predictions += np.sum(predictions == labels)
+
+    accuracy = correct_predictions / X_test.shape[0]
+    accuracy_track.append(accuracy)
+    print(f"Epoch {epoch + 1}/{epochs}, Accuracy: {accuracy:.4f}")
+
     end = time.time()
-    length = end - start
-    print("Training epoch time: ", length)
+    print("Training epoch time: ", end - start)
 
 run_end = time.time()
-run_length = run_end - run_start
-print("Total training time: ", run_length)
+print("Total training time: ", run_end - run_start)
 
-# Evaluate on the test set
-correct_predictions = 0
 for i in range(0, X_test.shape[0], batch_size):
     X_batch = X_test[i:i + batch_size]
     y_batch = y_test[i:i + batch_size]
@@ -177,9 +189,20 @@ for i in range(0, X_test.shape[0], batch_size):
 accuracy = correct_predictions / X_test.shape[0]
 print(f"Test Accuracy: {accuracy:.2f}")
 
+# Plot loss
+plt.figure(figsize=(10, 6))
+plt.bar(range(epochs), loss_track, label="Training Loss",color='blue')
+plt.title("CIFAR Loss with 10 Epochs, 32 Batch Size, and 0.001 Learning Rate")
+plt.xlabel("Epochs")
+plt.ylabel("Loss")
+plt.grid(True)
+plt.show()
 
-## example run
-input_data = np.random.randn(1, 1, 32, 32)  # Batch size = 1, grayscale image (1 channel)
-lenet = LeNet5(input_shape=(1, 32, 32), num_classes=10)
-output = lenet.forward(input_data)
-print("Output shape:", output.shape)  # Should be (1, 10)
+# Plot accuracy
+plt.figure(figsize=(10, 6))
+plt.bar(range(epochs), accuracy_track, label="Test Accuracy", color='blue')
+plt.title("Accuracy with 10 Epochs, 32 Batch Size, and 0.001 Learning Rate")
+plt.xlabel("Epochs")
+plt.ylabel("Accuracy")
+plt.grid(True)
+plt.show()
