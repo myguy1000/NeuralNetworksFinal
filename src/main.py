@@ -1,5 +1,3 @@
-import numpy as np
-import pandas as pd
 from sklearn.datasets import fetch_openml
 from sklearn.preprocessing import OneHotEncoder
 import tensorflow as tf
@@ -40,17 +38,11 @@ y_cifar10_test = tf.keras.utils.to_categorical(y_cifar10_test, 10)
 # Convert TensorFlow tensors to NumPy arrays (if needed)
 X_mnist = np.array(X_mnist)
 y_mnist = np.array(y_mnist)
+
 X_cifar10_train = np.array(X_cifar10_train)
-X_cifar10_train = X_cifar10_train[:1000]
-
 y_cifar10_train = np.array(y_cifar10_train)
-y_cifar10_train = y_cifar10_train[:1000]
-
 X_cifar10_test = np.array(X_cifar10_test)
-X_cifar10_test = X_cifar10_test[:1000]
-
 y_cifar10_test = np.array(y_cifar10_test)
-y_cifar10_test = y_cifar10_test[:1000]
 
 
 print("CIFAR-10 dataset loaded:")
@@ -125,8 +117,6 @@ for i in range(0, X_test.shape[0], batch_size):
 
 accuracy = correct_predictions / X_test.shape[0]
 print(f"Test Accuracy: {accuracy:.2f}")
-
-
 
 
 ## example run
